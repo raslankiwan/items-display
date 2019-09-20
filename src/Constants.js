@@ -1,0 +1,6 @@
+export const ID_LABEL = 'Id' 
+export const TITLE_LABEL = 'Title' 
+export const DESCRIPTION_LABEL = 'Description'
+export const LOAD_MORE_LABEL = 'Loading...'
+export const SELECT_ITEM_MESSAGE= 'Please select an item from the list'
+export const NO_ITEMS_MESSAGE='No items available'
