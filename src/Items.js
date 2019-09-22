@@ -2,65 +2,71 @@ import React from 'react'
 import axios from 'axios'
 import InfiniteScroll from 'react-infinite-scroller'
 import * as constants from './Constants'
+
 export default class Items extends React.Component {
 
     state = {
         items: [], 
         selected: null,
-        offset:0,
-        loadMore: true
+        offset: 0,
+        loadMore: true,
+        isMobile: false,
+        itemClicked: false
     }
 
     componentDidMount() {
+        window.addEventListener('resize', this.handleWindowSizeChange);
+        let isMobile = window.innerWidth <= 500;
+        this.setState({isMobile})
         this.getItems()
-        console.log(constants.DESCRIPTION_LABEL)
     }
 
+    componentWillUnmount(){
+        window.removeEventListener('resize', this.handleWindowSizeChange);
+    }
+
+    handleWindowSizeChange = () => {
+        let isMobile = window.innerWidth <= 500;
+        this.setState({isMobile})
+    };
+
     getItems () {
-        let {offset , items} = this.state
+        let { offset, items } = this.state
         axios.get(`https://kn4f3kklu4.execute-api.eu-west-1.amazonaws.com/default/jstasks?offset=${offset}&count=10`)
         .then(response => {
             const data = response.data
             let loadMore = true
-            if(data.length<10) {
+            if(data.length < 10) {
                 loadMore = false
             }
-            this.setState({items: [...items,...data] , offset:offset+11 , loadMore })
+            this.setState({items: [...items,...data], offset:offset+11, loadMore})
         })
     }
 
- 
-
-    renderSingleItem(item) {
-        
+    setSelectedItem(item) {
         axios.get(`https://kn4f3kklu4.execute-api.eu-west-1.amazonaws.com/default/jstasks/item?id=${item.id}`)
         .then(response => {
             const data = response.data
-            this.setState({selected: data})
+            this.setState({selected: data, itemClicked: true})
         })
-
-       
     }
 
-    render() {
-        const { items, selected } = this.state
-        return(
-            items ?
-            <div style={styles.mainContainer}>
-                <div style={styles.itemsList} ref={(ref) => this.scrollParentRef = ref} >
+    renderItemList(items, isMobile, listWidth) {
+        return (
+            <div style={{width:listWidth, overflowY: 'scroll', height:'100%', }} ref={(ref) => this.scrollParentRef = ref} >
                 <InfiniteScroll
-                        pageStart={0}
-                        loadMore={() => this.getItems()}
-                        hasMore={this.state.loadMore}
-                        threshold={100}
-                        initialLoad={true}
-                        loader={<h4 style={{ color: 'Black' }} key={0}>{constants.LOAD_MORE_LABEL}</h4>}
-                        useWindow={false}
-                        getScrollParent={() => this.scrollParentRef}
-                    >
+                    pageStart={0}
+                    loadMore={() => this.getItems()}
+                    hasMore={this.state.loadMore}
+                    threshold={100}
+                    initialLoad={true}
+                    loader={<h4 style={{ color: 'Black' }} key={0}>{constants.LOAD_MORE_LABEL}</h4>}
+                    useWindow={false}
+                    getScrollParent={() => this.scrollParentRef}
+                >
                     {items.map(item => {
                         return(
-                            <div style={styles.itemRow} onClick={() => this.renderSingleItem(item)} >
+                            <div key={item.id} style={styles.itemRow} onClick={() => this.setSelectedItem(item, isMobile)} >
                                 <img src={item.thumb} alt="thumb" style={styles.itemThumb} />    
                                 <div style={{flexDirection:'column'}}>
                                     <p style={{fontWeight:'bold'}}>{constants.ID_LABEL}: <span style={{fontWeight:'normal'}}>{item.id}</span></p>
@@ -69,30 +75,69 @@ export default class Items extends React.Component {
                             </div>
                         )
                     })}
-                    </InfiniteScroll>
-                </div> 
-                <div >
-                    {selected ? 
-                        <div  style={styles.selectedItem}>
-                            <img src={selected.picture} alt="" style={styles.itemPicture}  />
-                            <div>
-                                <p style={{fontWeight:'bold'}}>{constants.ID_LABEL}: <span style={{fontWeight:'normal'}}>{selected.id} </span></p>
-                            </div>
-                            <div>
-                            <p style={{fontWeight:'bold'}}>{constants.TITLE_LABEL}: <span style={{fontWeight:'normal'}}>{selected.title} </span>   </p>
-                            </div>
-                            <div>
-                                <p style={{fontWeight:'bold'}}>{constants.DESCRIPTION_LABEL}: <span style={{fontWeight:'normal'}}>{selected.desc}</span></p>
-                            </div>
-                        </div>
-                        :
-                        <div style={{textAlign:'center'}} >
-                           <p > {constants.SELECT_ITEM_MESSAGE}</p>
-                        </div>
-                    }
+                </InfiniteScroll>
+            </div> 
+        )
+    }
+
+    renderSingleItem(selected, isMobile, itemClicked) {
+        return (
+            selected && selected.id ?
+            <div>
+                {
+                    isMobile && itemClicked?
+                    <div>
+                    <button onClick={() => {this.setState({itemClicked: false})}} >Back</button>
+                    </div>
+                    :
+                    null
+                }
+                <div  style={styles.selectedItem}>
+                    <img src={selected.picture} alt="" style={styles.itemPicture}  />
+                    <div>
+                        <p style={{fontWeight:'bold'}}>{constants.ID_LABEL}: <span style={{fontWeight:'normal'}}>{selected.id}</span></p>
+                    </div>
+                    <div>
+                    <p style={{fontWeight:'bold'}}>{constants.TITLE_LABEL}: <span style={{fontWeight:'normal'}}>{selected.title}</span></p>
+                    </div>
+                    <div>
+                        <p style={{fontWeight:'bold'}}>{constants.DESCRIPTION_LABEL}: <span style={{fontWeight:'normal'}}>{selected.desc}</span></p>
+                    </div>
                 </div>
             </div>
-            : <div><p>{constants.NO_ITEMS_MESSAGE}</p></div>
+            : 
+            <div style={{textAlign:'center'}} >
+                <p> {constants.SELECT_ITEM_MESSAGE}</p>
+            </div>
+        )
+    }
+
+    render() {
+        const { items, selected, isMobile, itemClicked } = this.state
+        let listWidth = '25%'
+        if (isMobile) {
+            listWidth = '100%'
+        }
+        return(
+            items ?
+            <div>
+                {   
+                    !isMobile ?
+                        <div style={styles.mainContainer}>
+                            {this.renderItemList(items, isMobile, listWidth)}
+                            {this.renderSingleItem(selected)}
+                        </div>
+                    :
+                        itemClicked ?
+                        <div style={styles.mainContainer}>
+                            {this.renderSingleItem(selected, isMobile, itemClicked)}
+                        </div>
+                        :
+                        <div style={styles.mainContainer}>{this.renderItemList(items, isMobile, listWidth)}</div>
+                }
+            </div>
+            : 
+            <div><p>{constants.NO_ITEMS_MESSAGE}</p></div>
         )
     }
 }
@@ -109,11 +154,6 @@ const styles = {
         height:'100vh',
         borderColor: '#000000',
     },
-    "itemsList": {
-        overflowY: 'scroll',
-        height:'100%', 
-        width:'25%'
-    },
     "itemRow": {
         borderStyle: 'solid',
         display: 'flex',
@@ -126,19 +166,19 @@ const styles = {
         borderColor: '#000000',
 
     },
-    "selectedItem": {
-        flex: 1,
-        flexDirection: 'column', 
-        height:'100%', 
-        justifyContent:'center', 
-        alignItems: 'center',
-        padding: '20px',
-    },
     "itemThumb": {
         width: '100px',
         height: '100%',
         padding:'5px'
-    }, 
+    },     
+    "selectedItem": {
+        flex: 1,
+        flexDirection: 'column', 
+        justifyContent:'center', 
+        alignItems: 'center',
+        padding: '20px',
+        height:'100%',
+    },
     "itemPicture": {
         width: '80%',
         height: '300px',
